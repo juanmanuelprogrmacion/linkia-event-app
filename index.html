@@ -1,0 +1,814 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>ERD por capas — App Networking por Eventos (2026)</title>
+
+    <style>
+        :root {
+            --bg: #0b0f14;
+            --panel: #0f1722;
+            --border: #1f2a37;
+            --muted: #93a4b5;
+            --text: #e6edf3;
+            --btn: #162235;
+            --btn2: #0b1220;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        }
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            background: var(--bg);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 18px;
+        }
+
+        h1 {
+            margin: 0 0 6px 0;
+            font-size: 16px;
+        }
+
+        .sub {
+            margin: 0;
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.35;
+        }
+
+
+        .wrap {
+            display: grid;
+            grid-template-columns: 380px 1fr;
+            min-height: calc(100vh - 56px);
+        }
+
+        aside {
+            border-right: 1px solid var(--border);
+            padding: 14px;
+            overflow: auto;
+        }
+
+        main {
+            padding: 14px;
+            overflow: auto;
+        }
+
+        .card {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+
+        .card h2 {
+            margin: 0 0 10px 0;
+            font-size: 13px;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: var(--muted);
+            line-height: 1.45;
+        }
+
+        .tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin: 8px 0 6px 0;
+        }
+
+        .tab {
+            background: var(--btn);
+            border: 1px solid #2b3b4f;
+            color: var(--text);
+            padding: 8px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 12px;
+            user-select: none;
+        }
+
+        .tab:hover {
+            filter: brightness(1.08);
+        }
+
+        .tab.active {
+            outline: 2px solid #3b82f6;
+            outline-offset: 0;
+        }
+
+        .row {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        button {
+            background: var(--btn2);
+            border: 1px solid #2b3b4f;
+            color: var(--text);
+            padding: 8px 10px;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        button:hover {
+            filter: brightness(1.08);
+        }
+
+        textarea {
+            width: 100%;
+            height: 220px;
+            resize: vertical;
+            background: var(--btn2);
+            color: var(--text);
+            border: 1px solid #2b3b4f;
+            border-radius: 12px;
+            padding: 10px;
+            font-size: 12px;
+            font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        }
+
+        .small {
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 8px;
+        }
+
+        .mermaid {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .kbd {
+            font-family: ui-monospace, Menlo, Consolas, monospace;
+            font-size: 12px;
+            padding: 2px 6px;
+            border-radius: 8px;
+            border: 1px solid #2b3b4f;
+            background: var(--btn2);
+        }
+
+        /* Highlight UX */
+        .table.is-dim {
+            opacity: .18;
+            filter: saturate(.6);
+        }
+
+        .table.is-focus {
+            outline: 2px solid rgba(125, 211, 252, 0.45);
+            box-shadow: 0 18px 44px rgba(0, 0, 0, 0.55);
+            transform: translateY(-1px);
+        }
+
+        .line.is-dim {
+            opacity: .12;
+        }
+
+        .line.is-focus {
+            stroke-width: 3.2;
+            opacity: .95;
+        }
+
+        .toolbar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-top: 10px;
+        }
+
+        .btn {
+            cursor: pointer;
+            font-size: 12px;
+            padding: 8px 10px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            background: rgba(255, 255, 255, 0.05);
+            color: var(--text);
+        }
+
+        .btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+    </style>
+
+
+    <!-- Mermaid (requiere internet) -->
+    <script type="module">
+        import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+        mermaid.initialize({
+            startOnLoad: false,
+            theme: "dark",
+            er: { diagramPadding: 10, minEntityWidth: 120, minEntityHeight: 70 }
+        });
+
+        const LAYERS = {
+            core: `erDiagram
+  AUTH_USERS ||--|| PROFILES : "id = user_id"
+  PROFILES ||--o{ PROFILE_LINKS : has
+
+  EVENTS ||--o{ EVENT_MEMBERSHIPS : contains
+  PROFILES ||--o{ EVENT_MEMBERSHIPS : attends
+  EVENTS ||--o{ EVENT_PROFILE_OVERRIDES : overrides
+  PROFILES ||--o{ EVENT_PROFILE_OVERRIDES : customizes
+
+  EVENTS ||--o{ SWIPES : records
+  PROFILES ||--o{ SWIPES : makes
+  PROFILES ||--o{ SWIPES : targets
+
+  EVENTS ||--o{ MATCHES : yields
+  PROFILES ||--o{ MATCHES : user_a
+  PROFILES ||--o{ MATCHES : user_b
+
+  EVENTS ||--o{ COLD_REQUESTS : contains
+  PROFILES ||--o{ COLD_REQUESTS : sends
+  PROFILES ||--o{ COLD_REQUESTS : receives
+
+  EVENTS ||--o{ CONVERSATIONS : contains
+  MATCHES ||--o| CONVERSATIONS : creates
+  PROFILES ||--o{ CONVERSATIONS : user_a
+  PROFILES ||--o{ CONVERSATIONS : user_b
+  CONVERSATIONS ||--o{ MESSAGES : has
+  PROFILES ||--o{ MESSAGES : sends
+
+  AUTH_USERS { uuid id PK }
+  PROFILES {
+    uuid user_id PK
+    text display_name
+    text headline
+    text bio
+    text company
+    text role_title
+    text avatar_path
+    jsonb profile_meta
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  PROFILE_LINKS {
+    uuid id PK
+    uuid user_id FK
+    text link_type
+    text url
+    text label
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  EVENTS {
+    uuid id PK
+    citext code
+    text name
+    text event_type
+    timestamptz starts_at
+    timestamptz ends_at
+    text venue_name
+    text city
+    text country
+    text checkin_mode
+    jsonb event_meta
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  EVENT_MEMBERSHIPS {
+    uuid id PK
+    uuid event_id FK
+    uuid user_id FK
+    enum presence
+    enum event_role
+    boolean is_invisible
+    timestamptz registered_at
+    timestamptz present_at
+    timestamptz attended_at
+    timestamptz last_active_at
+    jsonb membership_meta
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  EVENT_PROFILE_OVERRIDES {
+    uuid id PK
+    uuid event_id FK
+    uuid user_id FK
+    text event_bio
+    text objectives
+    text role_in_event
+    jsonb override_meta
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  SWIPES {
+    uuid id PK
+    uuid event_id FK
+    uuid swiper_user_id FK
+    uuid target_user_id FK
+    enum direction
+    timestamptz created_at
+  }
+  MATCHES {
+    uuid id PK
+    uuid event_id FK
+    uuid user_a FK
+    uuid user_b FK
+    timestamptz created_at
+    timestamptz deleted_at
+  }
+  COLD_REQUESTS {
+    uuid id PK
+    uuid event_id FK
+    uuid from_user_id FK
+    uuid to_user_id FK
+    text message
+    enum status
+    timestamptz decided_at
+    timestamptz expires_at
+    timestamptz created_at
+    jsonb meta
+  }
+  CONVERSATIONS {
+    uuid id PK
+    uuid event_id FK
+    uuid match_id FK
+    uuid user_a FK
+    uuid user_b FK
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  MESSAGES {
+    uuid id PK
+    uuid conversation_id FK
+    uuid sender_user_id FK
+    text message_type
+    text body
+    text storage_path
+    text mime_type
+    timestamptz created_at
+    timestamptz read_at
+    timestamptz deleted_at
+  }`,
+
+            saas: `erDiagram
+  ORGANIZATIONS ||--o{ EVENTS : owns
+  ORGANIZATIONS ||--o{ ORGANIZATION_MEMBERS : members
+  EVENTS ||--o{ EVENT_INVITES : invites
+
+  EVENTS ||--o{ STANDS : has
+  EVENTS ||--o{ ADS : serves
+  STANDS ||--o{ ADS : promotes
+
+  TAG_CATALOG ||--o{ TAG_ALIASES : aliases
+  PROFILES ||--o{ PROFILE_TAGS : tagged
+  TAG_CATALOG ||--o{ PROFILE_TAGS : maps
+
+  AUTH_USERS ||--|| PROFILES : "id = user_id"
+  AUTH_USERS ||--o{ ORGANIZATION_MEMBERS : joins
+  AUTH_USERS ||--o{ EVENT_INVITES : receives
+
+  ORGANIZATIONS {
+    uuid id PK
+    text name
+    citext slug
+    uuid owner_user_id FK
+    jsonb org_meta
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  ORGANIZATION_MEMBERS {
+    uuid id PK
+    uuid organization_id FK
+    uuid user_id FK
+    enum role
+    timestamptz created_at
+  }
+  EVENTS {
+    uuid id PK
+    uuid organization_id FK
+    citext code
+    text name
+    text event_type
+    timestamptz starts_at
+    timestamptz ends_at
+    text venue_name
+    text city
+    text country
+    text checkin_mode
+    jsonb event_meta
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  EVENT_INVITES {
+    uuid id PK
+    uuid event_id FK
+    citext email
+    uuid user_id FK
+    citext invite_code
+    text status
+    timestamptz expires_at
+    timestamptz created_at
+  }
+  STANDS {
+    uuid id PK
+    uuid event_id FK
+    text company_name
+    text description
+    text logo_path
+    text website
+    jsonb stand_meta
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  ADS {
+    uuid id PK
+    uuid event_id FK
+    uuid stand_id FK
+    text ad_type
+    text title
+    text body
+    text media_path
+    text target_url
+    int weight
+    timestamptz starts_at
+    timestamptz ends_at
+    timestamptz created_at
+    timestamptz updated_at
+    timestamptz deleted_at
+  }
+  AUTH_USERS { uuid id PK }
+  PROFILES { uuid user_id PK }
+  TAG_CATALOG {
+    uuid id PK
+    text namespace
+    citext slug
+    text label
+    text description
+    text status
+    timestamptz created_at
+  }
+  TAG_ALIASES {
+    uuid id PK
+    text namespace
+    citext alias
+    uuid canonical_tag_id FK
+  }
+  PROFILE_TAGS {
+    uuid id PK
+    uuid user_id FK
+    uuid tag_id FK
+    text source
+    timestamptz created_at
+  }`,
+
+            analytics_ai: `erDiagram
+  EVENTS ||--o{ EVENT_LOG : logs
+  PROFILES ||--o{ EVENT_LOG : actor
+
+  EVENTS ||--o{ AUDIT_LOG : audits
+  PROFILES ||--o{ AUDIT_LOG : actor
+
+  EVENTS ||--o{ SEARCH_DOCUMENTS : indexes
+
+  ACHIEVEMENTS ||--o{ USER_ACHIEVEMENTS : grants
+  PROFILES ||--o{ USER_ACHIEVEMENTS : earns
+
+  EVENTS {
+    uuid id PK
+    citext code
+    text name
+    timestamptz starts_at
+    timestamptz ends_at
+  }
+  PROFILES {
+    uuid user_id PK
+    text display_name
+  }
+  EVENT_LOG {
+    uuid id PK
+    timestamptz occurred_at
+    uuid actor_user_id FK
+    text event_name
+    text entity_type
+    uuid entity_id
+    uuid event_id FK
+    jsonb payload
+  }
+  AUDIT_LOG {
+    uuid id PK
+    timestamptz occurred_at
+    uuid actor_user_id FK
+    text table_name
+    uuid row_pk
+    text action
+    jsonb before
+    jsonb after
+    uuid event_id FK
+  }
+  SEARCH_DOCUMENTS {
+    uuid id PK
+    text doc_type
+    uuid doc_id
+    uuid event_id FK
+    text text_content
+    tsvector tsv
+    vector embedding
+    text embedding_model
+    int embedding_version
+    timestamptz updated_at
+  }
+  ACHIEVEMENTS {
+    uuid id PK
+    citext code
+    text name
+    text category
+    jsonb criteria
+    jsonb unlocks
+    timestamptz created_at
+  }
+  USER_ACHIEVEMENTS {
+    uuid id PK
+    uuid user_id FK
+    uuid achievement_id FK
+    timestamptz earned_at
+    jsonb context
+  }`,
+
+            full: `erDiagram
+  AUTH_USERS ||--|| PROFILES : "id = user_id"
+  PROFILES ||--o{ PROFILE_LINKS : has
+
+  PROFILES ||--o{ PROFILE_TAGS : tagged
+  TAG_CATALOG ||--o{ PROFILE_TAGS : maps
+  TAG_CATALOG ||--o{ TAG_ALIASES : aliases
+
+  ORGANIZATIONS ||--o{ EVENTS : owns
+  ORGANIZATIONS ||--o{ ORGANIZATION_MEMBERS : members
+
+  EVENTS ||--o{ EVENT_INVITES : invites
+  EVENTS ||--o{ EVENT_MEMBERSHIPS : contains
+  PROFILES ||--o{ EVENT_MEMBERSHIPS : attends
+
+  EVENTS ||--o{ EVENT_PROFILE_OVERRIDES : overrides
+  PROFILES ||--o{ EVENT_PROFILE_OVERRIDES : customizes
+
+  EVENTS ||--o{ STANDS : has
+  EVENTS ||--o{ ADS : serves
+  STANDS ||--o{ ADS : promotes
+
+  EVENTS ||--o{ SWIPES : records
+  PROFILES ||--o{ SWIPES : makes
+  PROFILES ||--o{ SWIPES : targets
+
+  EVENTS ||--o{ MATCHES : yields
+  PROFILES ||--o{ MATCHES : user_a
+  PROFILES ||--o{ MATCHES : user_b
+
+  EVENTS ||--o{ COLD_REQUESTS : contains
+  PROFILES ||--o{ COLD_REQUESTS : sends
+  PROFILES ||--o{ COLD_REQUESTS : receives
+
+  EVENTS ||--o{ CONVERSATIONS : contains
+  MATCHES ||--o| CONVERSATIONS : creates
+  PROFILES ||--o{ CONVERSATIONS : user_a
+  PROFILES ||--o{ CONVERSATIONS : user_b
+  CONVERSATIONS ||--o{ MESSAGES : has
+  PROFILES ||--o{ MESSAGES : sends
+
+  ACHIEVEMENTS ||--o{ USER_ACHIEVEMENTS : grants
+  PROFILES ||--o{ USER_ACHIEVEMENTS : earns
+
+  EVENTS ||--o{ EVENT_LOG : logs
+  PROFILES ||--o{ EVENT_LOG : actor
+  EVENTS ||--o{ AUDIT_LOG : audits
+  PROFILES ||--o{ AUDIT_LOG : actor
+
+  EVENTS ||--o{ SEARCH_DOCUMENTS : indexes
+
+  AUTH_USERS { uuid id PK }
+  PROFILES { uuid user_id PK }
+  PROFILE_LINKS { uuid id PK  uuid user_id FK }
+  ORGANIZATIONS { uuid id PK }
+  ORGANIZATION_MEMBERS { uuid id PK uuid organization_id FK uuid user_id FK }
+  EVENTS { uuid id PK uuid organization_id FK }
+  EVENT_INVITES { uuid id PK uuid event_id FK }
+  EVENT_MEMBERSHIPS { uuid id PK uuid event_id FK uuid user_id FK }
+  EVENT_PROFILE_OVERRIDES { uuid id PK uuid event_id FK uuid user_id FK }
+  STANDS { uuid id PK uuid event_id FK }
+  ADS { uuid id PK uuid event_id FK uuid stand_id FK }
+  SWIPES { uuid id PK uuid event_id FK uuid swiper_user_id FK uuid target_user_id FK }
+  MATCHES { uuid id PK uuid event_id FK user_a FK uuid user_b FK }
+  COLD_REQUESTS { uuid id PK uuid event_id FK uuid from_user_id FK uuid to_user_id FK }
+  CONVERSATIONS { uuid id PK uuid event_id FK uuid match_id FK uuid user_a FK uuid user_b FK }
+  MESSAGES { uuid id PK uuid conversation_id FK uuid sender_user_id FK }
+  ACHIEVEMENTS { uuid id PK }
+  USER_ACHIEVEMENTS { uuid id PK uuid user_id FK uuid achievement_id FK }
+  TAG_CATALOG { uuid id PK }
+  TAG_ALIASES { uuid id PK uuid canonical_tag_id FK }
+  PROFILE_TAGS { uuid id PK uuid user_id FK uuid tag_id FK }
+  EVENT_LOG { uuid id PK uuid event_id FK uuid actor_user_id FK }
+  AUDIT_LOG { uuid id PK uuid event_id FK uuid actor_user_id FK }
+  SEARCH_DOCUMENTS { uuid id PK uuid event_id FK }`
+        };
+
+        const prettyName = {
+            core: "Core",
+            saas: "SaaS + Taxonomía",
+            analytics_ai: "Analytics + AI",
+            full: "Full (todo)"
+        };
+
+        const setActiveTab = (key) => {
+            document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+            document.querySelector(`[data-layer="${key}"]`)?.classList.add("active");
+            document.getElementById("layerName").textContent = prettyName[key] ?? key;
+            document.getElementById("src").value = LAYERS[key];
+            render();
+        };
+
+        const render = async () => {
+            const src = document.getElementById("src").value.trim();
+            const host = document.getElementById("diagramHost");
+            host.innerHTML = `<div class="mermaid">${src}</div>`;
+            await mermaid.run({ querySelector: "#diagramHost .mermaid" });
+        };
+
+        const copySource = async () => {
+            await navigator.clipboard.writeText(document.getElementById("src").value);
+            alert("Código Mermaid copiado.");
+        };
+
+        window.__erd = { setActiveTab, render, copySource };
+
+        window.addEventListener("DOMContentLoaded", () => {
+            // default
+            setActiveTab("core");
+        });
+    </script>
+</head>
+
+<body>
+    <header>
+        <h1>ERD por capas — App de Networking por Eventos (2026)</h1>
+        <p class="sub">
+            Toggle de capas (Core / SaaS+Taxonomía / Analytics+AI / Full). Editás el Mermaid si querés y re-renderizás.
+            <span class="kbd">Tip:</span> en eventos grandes, mirá primero <span class="kbd">Core</span>.
+        </p>
+    </header>
+
+    <div class="wrap">
+        <aside>
+            <div class="card">
+                <h2>Capas</h2>
+                <div class="tabs">
+                    <div class="tab" data-layer="core" onclick="__erd.setActiveTab('core')">Core</div>
+                    <div class="tab" data-layer="saas" onclick="__erd.setActiveTab('saas')">SaaS + Taxonomía</div>
+                    <div class="tab" data-layer="analytics_ai" onclick="__erd.setActiveTab('analytics_ai')">Analytics +
+                        AI</div>
+                    <div class="tab" data-layer="full" onclick="__erd.setActiveTab('full')">Full</div>
+                </div>
+                <p class="hint">
+                    Capa actual: <b id="layerName">—</b><br />
+                    <span class="kbd">Core</span> = swipe/chat por evento.<br />
+                    <span class="kbd">SaaS</span> = organizadores, invitaciones, stands, ads, tags gobernados.<br />
+                    <span class="kbd">Analytics+AI</span> = trazabilidad, auditoría, búsqueda semántica, logros.
+                </p>
+                <div class="toolbar">
+                    <button class="btn" id="btnAllOn">Mostrar todo</button>
+                    <button class="btn" id="btnAllOff">Ocultar todo</button>
+                    <button class="btn" id="btnReset">Reset</button>
+                </div>
+            </div>
+
+
+            <div class="card">
+                <h2>Mermaid (editable)</h2>
+                <textarea id="src"></textarea>
+                <div class="row">
+                    <button onclick="__erd.render()">Render</button>
+                    <button onclick="__erd.copySource()">Copiar Mermaid</button>
+                </div>
+                <div class="small">
+                    Si no renderiza, puede ser que estés offline y no pueda bajar Mermaid desde el CDN.
+                    Si querés, te paso una versión “offline-ready”.
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Lectura rápida</h2>
+                <p class="hint">
+                    <b>Eventos</b> segmentan todo: membresía (<span class="kbd">event_memberships</span>), estado (<span
+                        class="kbd">presence</span>), perfil adaptado
+                    (<span class="kbd">event_profile_overrides</span>), swipes/matches/chat.
+                    Ads/stands se insertan en feed (cada 5–6 perfiles) pero no ven datos privados.
+                </p>
+            </div>
+        </aside>
+
+        <main>
+            <div id="diagramHost">
+                <div class="mermaid">erDiagram
+                    A||--||B : placeholder
+                </div>
+            </div>
+        </main>
+    </div>
+</body>
+
+<script>
+    const boxesByLayer = {
+        core: document.querySelectorAll('.layer-core'),
+        events: document.querySelectorAll('.layer-events'),
+        interactions: document.querySelectorAll('.layer-interactions'),
+        visibility: document.querySelectorAll('.layer-visibility'),
+        audit: document.querySelectorAll('.layer-audit'),
+    };
+
+    const layerCheckboxes = [...document.querySelectorAll('input[type="checkbox"][data-layer]')];
+    const allTables = [...document.querySelectorAll('.table')];
+    const allLines = [...document.querySelectorAll('#lines .line')];
+
+    // Layer toggles (tables + lines)
+    function setLayer(layer, on) {
+        boxesByLayer[layer].forEach(el => el.classList.toggle('layer-hidden', !on));
+        document.querySelectorAll(`.layer-${layer}`).forEach(el => el.classList.toggle('layer-hidden', !on));
+    }
+
+    layerCheckboxes.forEach(cb => {
+        cb.addEventListener('change', () => {
+            const layer = cb.getAttribute('data-layer');
+            setLayer(layer, cb.checked);
+            clearFocus();
+        });
+    });
+
+    // Buttons
+    document.getElementById('btnAllOn')?.addEventListener('click', () => {
+        layerCheckboxes.forEach(cb => { cb.checked = true; setLayer(cb.dataset.layer, true); });
+        clearFocus();
+    });
+
+    document.getElementById('btnAllOff')?.addEventListener('click', () => {
+        layerCheckboxes.forEach(cb => { cb.checked = false; setLayer(cb.dataset.layer, false); });
+        clearFocus();
+    });
+
+    document.getElementById('btnReset')?.addEventListener('click', () => {
+        // estado inicial: todo ON
+        layerCheckboxes.forEach(cb => { cb.checked = true; setLayer(cb.dataset.layer, true); });
+        clearFocus();
+        // opcional: scroll al inicio del canvas
+        document.querySelector('.canvas')?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    });
+
+    // Focus / dim on hover (simple pitch effect)
+    function clearFocus() {
+        allTables.forEach(t => t.classList.remove('is-focus', 'is-dim'));
+        allLines.forEach(l => l.classList.remove('is-focus', 'is-dim'));
+    }
+
+    allTables.forEach(t => {
+        t.addEventListener('mouseenter', () => {
+            // dim everything
+            allTables.forEach(x => x.classList.add('is-dim'));
+            allLines.forEach(x => x.classList.add('is-dim'));
+
+            // focus this table
+            t.classList.remove('is-dim');
+            t.classList.add('is-focus');
+
+            // focus same-layer lines (rápido y vendible en demo)
+            // si después querés “líneas exactas por FK”, lo hacemos con un mapa edges[]
+            const layerClass = [...t.classList].find(c => c.startsWith('layer-'));
+            if (layerClass) {
+                document.querySelectorAll(`#lines .${layerClass}`).forEach(l => {
+                    l.classList.remove('is-dim');
+                    l.classList.add('is-focus');
+                });
+            }
+        });
+
+        t.addEventListener('mouseleave', () => clearFocus());
+    });
+</script>
+
+</html>
