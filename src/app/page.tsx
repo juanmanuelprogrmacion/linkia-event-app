@@ -83,16 +83,14 @@ export default function EntryPage() {
               )}
             </button>
 
-            {process.env.NODE_ENV === 'development' && (
-              <button
-                onClick={handleTestLogin}
-                disabled={isLoggingIn}
-                className="btn btn-secondary w-full h-11 text-[13px]"
-              >
-                <span className="material-symbols-outlined text-base">bug_report</span>
-                Test Login
-              </button>
-            )}
+            <button
+              onClick={handleTestLogin}
+              disabled={isLoggingIn}
+              className="btn btn-secondary w-full h-11 text-[13px]"
+            >
+              <span className="material-symbols-outlined text-base">bug_report</span>
+              Test Login
+            </button>
           </div>
 
           {/* Footer hint */}
