@@ -1,259 +1,233 @@
-// API client for LinkiaEvent Edge Functions
+// API client for Linker — All calls via Supabase Edge Functions
 
+import { supabase } from './supabase'
+
+const EVENT_SLUG = process.env.NEXT_PUBLIC_EVENT_SLUG!
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const FUNCTIONS_URL = `${SUPABASE_URL}/functions/v1`
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+const STORAGE_KEY = 'linker_session'
 
-interface SessionResponse {
-    session_id: string
-    token: string
-    event: { id: string; name: string; slug: string }
-    profile_exists: boolean
-    profile_complete: boolean
+// --- Types ---
+
+export interface SessionResponse {
+  session_id: string
+  token: string
+  event: { id: string; name: string; slug: string }
+  profile_exists: boolean
+  profile_complete: boolean
 }
 
-interface ProfileData {
-    display_name: string
-    headline?: string
-    bio?: string
-    photo_url?: string
-    email?: string
-    phone?: string
-    linkedin_url?: string
-    website_url?: string
+export interface ProfileData {
+  display_name: string
+  headline: string
+  company?: string
+  bio?: string
+  photo_url?: string
+  linkedin_url?: string
+  whatsapp_number: string
+  looking_for?: string[]
 }
 
-interface Profile {
-    id: string
-    display_name: string
-    headline?: string
-    bio?: string
-    photo_url?: string
+export interface Profile {
+  id: string
+  display_name: string
+  headline?: string
+  company?: string
+  bio?: string
+  photo_url?: string
+  looking_for?: string[]
+  linkedin_url?: string
 }
 
-interface ProfileWithContact extends Profile {
-    email?: string
-    phone?: string
-    linkedin_url?: string
-    website_url?: string
+export interface ProfileWithContact extends Profile {
+  whatsapp_number?: string
 }
 
-interface SwipeResult {
-    success: boolean
-    is_match: boolean
-    match?: {
-        id: string
-        created_at: string
-        contact: ProfileWithContact
-    }
-}
-
-interface Match {
+export interface SwipeResult {
+  success: boolean
+  is_match: boolean
+  match?: {
     id: string
     created_at: string
-    profile: ProfileWithContact
+    contact: ProfileWithContact
+  }
 }
 
-// Generate device fingerprint
+export interface Match {
+  id: string
+  created_at: string
+  profile: ProfileWithContact
+}
+
+// --- Device fingerprint ---
+
 export function getDeviceFingerprint(): string {
-    if (typeof window === 'undefined') return 'server'
+  if (typeof window === 'undefined') return 'server'
 
-    const components = [
-        navigator.userAgent,
-        screen.width,
-        screen.height,
-        screen.colorDepth,
-        Intl.DateTimeFormat().resolvedOptions().timeZone,
-        new Date().getTimezoneOffset()
-    ]
-    return components.join('|')
+  const components = [
+    navigator.userAgent,
+    screen.width,
+    screen.height,
+    screen.colorDepth,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+    new Date().getTimezoneOffset(),
+  ]
+  return components.join('|')
 }
 
-// Session storage helpers
-const getStorageKey = (eventSlug: string) => `linkia_session_${eventSlug}`
+// --- Token storage ---
 
-export function getStoredToken(eventSlug: string): string | null {
-    if (typeof window === 'undefined') return null
-    return localStorage.getItem(getStorageKey(eventSlug))
+export function getStoredToken(): string | null {
+  if (typeof window === 'undefined') return null
+  return localStorage.getItem(STORAGE_KEY)
 }
 
-export function storeToken(eventSlug: string, token: string): void {
-    if (typeof window === 'undefined') return
-    localStorage.setItem(getStorageKey(eventSlug), token)
+export function storeToken(token: string): void {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEY, token)
 }
 
-export function clearToken(eventSlug: string): void {
-    if (typeof window === 'undefined') return
-    localStorage.removeItem(getStorageKey(eventSlug))
+export function clearToken(): void {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(STORAGE_KEY)
 }
 
-// API calls
-export async function createSession(eventSlug: string): Promise<SessionResponse> {
-    const response = await fetch(`${FUNCTIONS_URL}/create-session`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            event_slug: eventSlug,
-            device_fingerprint: getDeviceFingerprint()
-        })
-    })
+// --- Edge Function invoke helper ---
 
-    if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to create session')
+async function invoke<T>(
+  functionName: string,
+  body: object,
+  options?: { sendToken?: boolean }
+): Promise<T> {
+  const headers: Record<string, string> = {}
+
+  if (options?.sendToken !== false) {
+    const token = getStoredToken()
+    if (token) {
+      headers['x-session-token'] = token
     }
+  }
 
-    const data = await response.json()
-    storeToken(eventSlug, data.token)
-    return data
+  const { data, error } = await supabase.functions.invoke(functionName, {
+    body,
+    headers,
+  })
+
+  if (error) {
+    throw new Error(data?.error ?? error.message ?? 'Error de conexión')
+  }
+
+  if (data?.error) {
+    throw new Error(data.error)
+  }
+
+  return data as T
 }
 
-export async function upsertProfile(eventSlug: string, profileData: ProfileData): Promise<{ profile: Profile; is_complete: boolean }> {
-    const token = getStoredToken(eventSlug)
-    if (!token) throw new Error('No session token')
+// --- WhatsApp helpers ---
 
-    const response = await fetch(`${FUNCTIONS_URL}/upsert-profile`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(profileData)
-    })
-
-    if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to update profile')
-    }
-
-    return response.json()
+export function formatWhatsAppLink(number: string, eventName?: string): string {
+  const message = eventName
+    ? encodeURIComponent(`¡Hola! Nos conectamos en ${eventName} 🤝`)
+    : ''
+  return `https://wa.me/${number}${message ? `?text=${message}` : ''}`
 }
 
-export async function getFeed(eventSlug: string, limit = 10): Promise<Profile[]> {
-    const token = getStoredToken(eventSlug)
-    if (!token) throw new Error('No session token')
+// --- API calls ---
 
-    const response = await fetch(`${FUNCTIONS_URL}/get-feed?limit=${limit}`, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    })
+export async function createSession(): Promise<SessionResponse> {
+  const deviceHash = getDeviceFingerprint()
 
-    if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to get feed')
-    }
+  const data = await invoke<SessionResponse>('create-session', {
+    event_slug: EVENT_SLUG,
+    device_hash: deviceHash,
+  }, { sendToken: false })
 
-    const data = await response.json()
-    return data.profiles
+  storeToken(data.token)
+  return data
 }
 
-export async function submitSwipe(eventSlug: string, targetProfileId: string, action: 'connect' | 'skip'): Promise<SwipeResult> {
-    const token = getStoredToken(eventSlug)
-    if (!token) throw new Error('No session token')
+export async function resumeSession(token: string): Promise<SessionResponse> {
+  const { data, error } = await supabase.functions.invoke('create-session', {
+    body: { token },
+  })
 
-    const response = await fetch(`${FUNCTIONS_URL}/submit-swipe`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-            target_profile_id: targetProfileId,
-            action
-        })
-    })
+  if (error || data?.error) {
+    throw new Error(data?.error ?? 'Token inválido')
+  }
 
-    if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to submit swipe')
-    }
-
-    return response.json()
+  storeToken(data.token)
+  return data as SessionResponse
 }
 
-export async function getMatches(eventSlug: string): Promise<Match[]> {
-    const token = getStoredToken(eventSlug)
-    if (!token) throw new Error('No session token')
+export async function getOwnProfile(): Promise<ProfileData | null> {
+  const token = getStoredToken()
+  if (!token) return null
 
-    const response = await fetch(`${FUNCTIONS_URL}/get-matches`, {
-        method: 'GET',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        }
-    })
-
-    if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to get matches')
-    }
-
-    const data = await response.json()
-    return data.matches
+  try {
+    const data = await invoke<{ profile: ProfileData | null }>('get-profile', {})
+    return data.profile
+  } catch {
+    return null
+  }
 }
 
-export async function uploadPhoto(eventSlug: string, file: File): Promise<string> {
-    const token = getStoredToken(eventSlug)
-    if (!token) throw new Error('No session token')
-
-    const formData = new FormData()
-    formData.append('file', file)
-
-    const response = await fetch(`${FUNCTIONS_URL}/upload-photo`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${token}`
-        },
-        body: formData
-    })
-
-    if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to upload photo')
-    }
-
-    const data = await response.json()
-    return data.photo_url
+export async function upsertProfile(
+  profileData: ProfileData
+): Promise<{ profile: Profile; is_complete: boolean }> {
+  return invoke<{ profile: Profile; is_complete: boolean }>('upsert-profile', profileData)
 }
 
-// Event discovery APIs
-export interface EventInfo {
-    id: string
-    slug: string
-    name: string
-    description?: string
-    location?: string
-    starts_at: string
-    ends_at: string
-    cover_image_url?: string
-    is_virtual: boolean
-    participant_count: number
+export async function getFeed(limit = 20): Promise<Profile[]> {
+  try {
+    const data = await invoke<{ profiles: Profile[] }>('get-feed', { limit })
+    return data.profiles ?? []
+  } catch {
+    return []
+  }
 }
 
-export async function getEvents(): Promise<EventInfo[]> {
-    const response = await fetch(`${FUNCTIONS_URL}/get-events`, {
-        method: 'GET'
-    })
-
-    if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error || 'Failed to get events')
-    }
-
-    const data = await response.json()
-    return data.events
+export async function submitSwipe(
+  targetProfileId: string,
+  action: 'connect' | 'skip'
+): Promise<SwipeResult> {
+  return invoke<SwipeResult>('submit-swipe', {
+    target_profile_id: targetProfileId,
+    action,
+  })
 }
 
-export async function validateEventCode(eventSlug: string, code: string): Promise<{ valid: boolean; error?: string }> {
-    const response = await fetch(`${FUNCTIONS_URL}/validate-code`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            event_slug: eventSlug,
-            access_code: code
-        })
-    })
+export async function getMatches(): Promise<Match[]> {
+  try {
+    const data = await invoke<{ matches: Match[] }>('get-matches', {})
+    return data.matches ?? []
+  } catch {
+    return []
+  }
+}
 
-    const data = await response.json()
-    return { valid: data.valid ?? false, error: data.error }
+export async function uploadPhoto(file: File): Promise<string> {
+  const token = getStoredToken()
+  if (!token) throw new Error('Sin sesión activa')
+
+  const formData = new FormData()
+  formData.append('file', file)
+
+  // Direct fetch because supabase.functions.invoke doesn't support FormData
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/upload-photo`, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+      'x-session-token': token,
+    },
+    body: formData,
+  })
+
+  const data = await response.json()
+
+  if (!response.ok || data.error) {
+    throw new Error(data.error ?? 'No se pudo subir la foto')
+  }
+
+  return data.url
 }

@@ -2,139 +2,111 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { AnimatePresence, motion } from 'framer-motion'
-import { getEvents, EventInfo } from '@/lib/api'
-import { EventCard } from './components/EventCard'
-import { CodeModal } from './components/CodeModal'
+import { useSession } from '@/lib/session-context'
 
-export default function HomePage() {
+const TEST_TOKEN = 'test-dev-token-linker-2026'
+
+export default function EntryPage() {
   const router = useRouter()
-  const [events, setEvents] = useState<EventInfo[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [selectedEvent, setSelectedEvent] = useState<EventInfo | null>(null)
+  const { isLoading, isAuthenticated, profileComplete, initSession, loginWithToken } =
+    useSession()
+  const [isLoggingIn, setIsLoggingIn] = useState(false)
 
   useEffect(() => {
-    const loadEvents = async () => {
-      try {
-        const eventList = await getEvents()
-        setEvents(eventList)
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Failed to load events')
-      } finally {
-        setIsLoading(false)
-      }
+    if (isLoading) return
+    if (isAuthenticated && profileComplete) {
+      router.replace('/descubrir')
+    } else if (isAuthenticated && !profileComplete) {
+      router.replace('/perfil')
     }
+  }, [isLoading, isAuthenticated, profileComplete, router])
 
-    loadEvents()
-  }, [])
-
-  const handleCheckIn = (event: EventInfo) => {
-    setSelectedEvent(event)
+  async function handleNewSession() {
+    setIsLoggingIn(true)
+    const complete = await initSession()
+    router.replace(complete ? '/descubrir' : '/perfil')
   }
 
-  const handleCodeSuccess = (event: EventInfo) => {
-    setSelectedEvent(null)
-    router.push(`/e/${event.slug}`)
+  async function handleTestLogin() {
+    setIsLoggingIn(true)
+    const complete = await loginWithToken(TEST_TOKEN)
+    router.replace(complete ? '/descubrir' : '/perfil')
   }
 
   if (isLoading) {
     return (
       <main className="min-h-dvh flex items-center justify-center">
-        <div className="text-center">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-          <p className="text-text-secondary">Cargando eventos...</p>
-        </div>
+        <div className="w-11 h-11 spinner" />
       </main>
     )
   }
 
-  if (error) {
+  if (!isAuthenticated) {
     return (
-      <main className="min-h-dvh flex items-center justify-center p-6">
-        <div className="glass rounded-2xl p-8 max-w-md text-center">
-          <div className="text-5xl mb-4">😕</div>
-          <h1 className="text-xl font-semibold mb-2">Error</h1>
-          <p className="text-text-secondary mb-6">{error}</p>
-          <button
-            onClick={() => window.location.reload()}
-            className="btn btn-primary"
-          >
-            Reintentar
-          </button>
+      <main className="relative min-h-dvh flex flex-col items-center justify-center px-6 overflow-hidden">
+        {/* Layered ambient background */}
+        <div className="ambient-glow" />
+
+        {/* Decorative orbs */}
+        <div className="absolute top-[15%] left-[10%] w-64 h-64 rounded-full bg-accent/[0.04] blur-[80px] animate-float" />
+        <div className="absolute bottom-[20%] right-[5%] w-48 h-48 rounded-full bg-connect/[0.03] blur-[60px] animate-float" style={{ animationDelay: '1.5s' }} />
+
+        <div className="relative z-10 w-full max-w-sm">
+          {/* Logo + Brand */}
+          <div className="text-center mb-10 animate-fade-in-up">
+            <div className="inline-flex items-center justify-center w-[80px] h-[80px] rounded-[22px] bg-accent/10 mb-7 animate-breathe">
+              <span className="material-symbols-outlined text-accent text-[38px]">hub</span>
+            </div>
+            <h1 className="text-[2.75rem] font-extrabold tracking-[-0.03em] leading-none mb-3">
+              Linker
+            </h1>
+            <p className="text-ink-secondary text-[1.0625rem] leading-relaxed font-light tracking-[-0.01em]">
+              Conecta con profesionales del evento
+            </p>
+            <div className="section-divider mt-8 mx-auto w-16 opacity-60" />
+          </div>
+
+          {/* CTA */}
+          <div className="space-y-3.5 animate-fade-in-up" style={{ animationDelay: '150ms' }}>
+            <button
+              onClick={handleNewSession}
+              disabled={isLoggingIn}
+              className="btn btn-primary w-full h-[56px] text-[1.0625rem] tracking-[-0.01em]"
+            >
+              {isLoggingIn ? (
+                <span className="flex items-center justify-center gap-2.5">
+                  <span className="w-5 h-5 spinner" style={{ borderWidth: '2px' }} />
+                  Entrando...
+                </span>
+              ) : (
+                'Entrar al evento'
+              )}
+            </button>
+
+            {process.env.NODE_ENV === 'development' && (
+              <button
+                onClick={handleTestLogin}
+                disabled={isLoggingIn}
+                className="btn btn-secondary w-full h-11 text-[13px]"
+              >
+                <span className="material-symbols-outlined text-base">bug_report</span>
+                Test Login
+              </button>
+            )}
+          </div>
+
+          {/* Footer hint */}
+          <p className="text-center text-ink-muted text-[13px] mt-8 animate-fade-in font-light tracking-wide" style={{ animationDelay: '400ms' }}>
+            Escanea el QR del evento para comenzar
+          </p>
         </div>
       </main>
     )
   }
 
   return (
-    <main className="min-h-dvh flex flex-col">
-      {/* Header */}
-      <header className="px-6 pt-8 pb-4">
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="text-center"
-        >
-          <h1 className="text-3xl font-bold mb-2">
-            <span className="gradient-text">LinkiaEvent</span>
-          </h1>
-          <p className="text-text-secondary">
-            Conecta con profesionales en eventos en vivo
-          </p>
-        </motion.div>
-      </header>
-
-      {/* Events Grid */}
-      <section className="flex-1 px-4 pb-8">
-        {events.length === 0 ? (
-          <div className="text-center py-16">
-            <div className="text-6xl mb-4">📭</div>
-            <h2 className="text-xl font-semibold mb-2">No hay eventos activos</h2>
-            <p className="text-text-secondary">
-              Vuelve pronto para ver nuevos eventos
-            </p>
-          </div>
-        ) : (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="grid gap-4 max-w-2xl mx-auto"
-          >
-            {events.map((event, index) => (
-              <motion.div
-                key={event.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: index * 0.1 }}
-              >
-                <EventCard
-                  event={event}
-                  onCheckIn={handleCheckIn}
-                />
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-      </section>
-
-      {/* Footer */}
-      <footer className="px-6 pb-8 text-center">
-        <p className="text-xs text-text-secondary">
-          🔒 Sin login • Networking anónimo
-        </p>
-      </footer>
-
-      {/* Code Modal */}
-      <AnimatePresence>
-        {selectedEvent && (
-          <CodeModal
-            event={selectedEvent}
-            onClose={() => setSelectedEvent(null)}
-            onSuccess={handleCodeSuccess}
-          />
-        )}
-      </AnimatePresence>
+    <main className="min-h-dvh flex items-center justify-center">
+      <div className="w-11 h-11 spinner" />
     </main>
   )
 }
