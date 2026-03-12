@@ -1,22 +1,15 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-let _supabase: SupabaseClient | null = null
+let _client: SupabaseClient | null = null
 
-export function getSupabase(): SupabaseClient {
-  if (!_supabase) {
+export function getSupabaseClient(): SupabaseClient {
+  if (!_client) {
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL
     const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
     if (!url || !key) {
       throw new Error('Supabase env vars not set')
     }
-    _supabase = createClient(url, key)
+    _client = createClient(url, key)
   }
-  return _supabase
+  return _client
 }
-
-// Backward-compatible export — only access at runtime, not module load
-export const supabase = new Proxy({} as SupabaseClient, {
-  get(_target, prop) {
-    return Reflect.get(getSupabase(), prop)
-  },
-})

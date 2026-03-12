@@ -1,6 +1,6 @@
 // API client for Linker — All calls via Supabase Edge Functions
 
-import { supabase } from './supabase'
+import { getSupabaseClient } from './supabase'
 
 const EVENT_SLUG = process.env.NEXT_PUBLIC_EVENT_SLUG!
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
@@ -108,7 +108,7 @@ async function invoke<T>(
     }
   }
 
-  const { data, error } = await supabase.functions.invoke(functionName, {
+  const { data, error } = await getSupabaseClient().functions.invoke(functionName, {
     body,
     headers,
   })
@@ -148,7 +148,7 @@ export async function createSession(): Promise<SessionResponse> {
 }
 
 export async function resumeSession(token: string): Promise<SessionResponse> {
-  const { data, error } = await supabase.functions.invoke('create-session', {
+  const { data, error } = await getSupabaseClient().functions.invoke('create-session', {
     body: { token },
   })
 

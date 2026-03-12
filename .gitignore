@@ -44,6 +44,9 @@ next-env.d.ts
 /*.png
 screenshots/
 
+# scripts (contain connection strings — use .env instead)
+/scripts/
+
 # MCP & tooling
 .mcp.json
 .playwright-mcp/
