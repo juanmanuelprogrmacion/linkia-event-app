@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getMatches, formatWhatsAppLink } from '@/lib/api'
@@ -61,7 +62,16 @@ export default function ConnectionsPage() {
     return `Hace ${diffDays}d`
   }
 
-  if (sessionLoading || isLoading) {
+  // Show nothing while checking auth to avoid content flash before redirect
+  if (sessionLoading) {
+    return (
+      <main className="min-h-dvh flex items-center justify-center">
+        <div className="w-11 h-11 spinner" />
+      </main>
+    )
+  }
+
+  if (isLoading) {
     return (
       <main className="min-h-dvh flex items-center justify-center">
         <div className="text-center animate-fade-in">
@@ -152,13 +162,14 @@ function ConnectionCard({
     <div className="connection-card p-5 cursor-pointer" onClick={onSelect}>
       {/* Top row: photo + info + time */}
       <div className="flex items-center gap-4">
-        <div className="w-[68px] h-[68px] rounded-full overflow-hidden bg-surface-elevated shrink-0 ring-2 ring-border-subtle ring-offset-2 ring-offset-surface">
+        <div className="relative w-[68px] h-[68px] rounded-full overflow-hidden bg-surface-elevated shrink-0 ring-2 ring-border-subtle ring-offset-2 ring-offset-surface">
           {match.profile.photo_url ? (
-            <img
+            <Image
               src={match.profile.photo_url}
               alt={match.profile.display_name}
-              className="w-full h-full object-cover"
-              loading="lazy"
+              fill
+              className="object-cover"
+              sizes="68px"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
@@ -228,6 +239,14 @@ function ProfileDetailModal({
   eventName?: string
   onClose: () => void
 }) {
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   const profile = match.profile
   const whatsappLink = profile.whatsapp_number
     ? formatWhatsAppLink(profile.whatsapp_number, eventName)
@@ -266,12 +285,14 @@ function ProfileDetailModal({
         </button>
 
         {/* Photo */}
-        <div className="w-full aspect-square bg-surface-elevated -mt-3">
+        <div className="relative w-full aspect-square bg-surface-elevated overflow-hidden -mt-3">
           {profile.photo_url ? (
-            <img
+            <Image
               src={profile.photo_url}
               alt={profile.display_name}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="(max-width: 430px) 100vw, 430px"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center">

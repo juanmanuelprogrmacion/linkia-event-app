@@ -31,6 +31,8 @@ src/app/page.tsx              → Entry point (session check → redirect)
 src/app/perfil/page.tsx       → Profile creation/edit
 src/app/descubrir/page.tsx    → Swipe feed (discover)
 src/app/conexiones/page.tsx   → Connections list (matches)
+src/app/not-found.tsx         → Custom 404 page
+src/app/error.tsx             → Global error boundary
 ```
 
 ### Key Modules
@@ -38,6 +40,17 @@ src/app/conexiones/page.tsx   → Connections list (matches)
 - **`src/lib/session-context.tsx`** — React context (`SessionProvider` at root) providing session state. All pages access via `useSession()`.
 - **`src/lib/image-utils.ts`** — Client-side image compression before upload.
 - **`src/lib/supabase.ts`** — Supabase client instance.
+
+### Image Handling
+- All user photos from Supabase Storage, optimized via `next/image` with `fill` + `sizes`
+- Client-side compression before upload (800px max, JPEG quality iteration)
+- Remote pattern configured in `next.config.ts`
+
+### Error Handling
+- Global error boundary (`src/app/error.tsx`) — catches runtime errors, shows retry button
+- Custom 404 (`src/app/not-found.tsx`) — styled, with "Ir al inicio" button
+- Escape key support on all modals (MatchPopup, ProfileDetailModal)
+- Auth guard shows spinner (no content flash before redirect)
 
 ### Auth Model
 Device fingerprint → bearer token in `localStorage` (key: `linker_session`). No email/password.
@@ -73,8 +86,20 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
 NEXT_PUBLIC_EVENT_SLUG=<event slug>
 ```
 
+## Production Notes
+- `NODE_ENV` automatically set by Vercel — no manual config needed
+- Test Login button only visible in development (`NODE_ENV === 'development'`)
+- MatchNotifier only polls on `/descubrir` and `/conexiones`
+- Service worker caches static assets only (no HTML, no API)
+
+## Audit Status
+- **Last audit**: 2026-03-12 (Playwright, 375px mobile viewport)
+- All 6 flows tested (entry, profile, discover, connections, modals, cross-cutting)
+- 12 issues found and resolved — see `docs/reports/2026-03-12-playwright-audit-report.md`
+
 ## Documentation
 - `docs/plans/` — Implementation plans
 - `docs/brainstorms/` — Design brainstorms
+- `docs/reports/` — Audit and testing reports
 - `.interface-design/system.md` — Design system spec
 - `MANU INFO/` — Original developer docs (reference only)

@@ -11,7 +11,7 @@ export function MatchNotifier() {
   const [isVisible, setIsVisible] = useState(false)
   const [isExiting, setIsExiting] = useState(false)
 
-  const shouldRun = pathname !== '/'
+  const shouldRun = pathname === '/descubrir' || pathname === '/conexiones'
 
   function dismiss() {
     setIsExiting(true)

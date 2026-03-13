@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation'
 import { useSession } from '@/lib/session-context'
 
 const TEST_TOKEN = 'test-dev-token-linker-2026'
+const IS_DEV = process.env.NODE_ENV === 'development'
 
 export default function EntryPage() {
   const router = useRouter()
   const { isLoading, isAuthenticated, profileComplete, initSession, loginWithToken } =
     useSession()
   const [isLoggingIn, setIsLoggingIn] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isLoading) return
@@ -22,15 +24,27 @@ export default function EntryPage() {
   }, [isLoading, isAuthenticated, profileComplete, router])
 
   async function handleNewSession() {
-    setIsLoggingIn(true)
-    const complete = await initSession()
-    router.replace(complete ? '/descubrir' : '/perfil')
+    try {
+      setError(null)
+      setIsLoggingIn(true)
+      const complete = await initSession()
+      router.replace(complete ? '/descubrir' : '/perfil')
+    } catch {
+      setError('No se pudo conectar. Verifica tu conexión e intenta de nuevo.')
+      setIsLoggingIn(false)
+    }
   }
 
   async function handleTestLogin() {
-    setIsLoggingIn(true)
-    const complete = await loginWithToken(TEST_TOKEN)
-    router.replace(complete ? '/descubrir' : '/perfil')
+    try {
+      setError(null)
+      setIsLoggingIn(true)
+      const complete = await loginWithToken(TEST_TOKEN)
+      router.replace(complete ? '/descubrir' : '/perfil')
+    } catch {
+      setError('No se pudo iniciar sesión de prueba.')
+      setIsLoggingIn(false)
+    }
   }
 
   if (isLoading) {
@@ -83,15 +97,24 @@ export default function EntryPage() {
               )}
             </button>
 
-            <button
-              onClick={handleTestLogin}
-              disabled={isLoggingIn}
-              className="btn btn-secondary w-full h-11 text-[13px]"
-            >
-              <span className="material-symbols-outlined text-base">bug_report</span>
-              Test Login
-            </button>
+            {IS_DEV && (
+              <button
+                onClick={handleTestLogin}
+                disabled={isLoggingIn}
+                className="btn btn-secondary w-full h-11 text-[13px]"
+              >
+                <span className="material-symbols-outlined text-base">bug_report</span>
+                Test Login
+              </button>
+            )}
           </div>
+
+          {/* Error */}
+          {error && (
+            <div className="mt-5 bg-destructive/10 border border-destructive/20 rounded-xl p-3.5 animate-scale-in">
+              <p className="text-destructive text-sm text-center">{error}</p>
+            </div>
+          )}
 
           {/* Footer hint */}
           <p className="text-center text-ink-muted text-[13px] mt-8 animate-fade-in font-light tracking-wide" style={{ animationDelay: '400ms' }}>

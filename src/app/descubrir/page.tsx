@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import {
   motion,
@@ -89,7 +90,16 @@ export default function DiscoverPage() {
   const currentProfile = profiles[currentIndex]
   const nextProfile = profiles[currentIndex + 1]
 
-  if (sessionLoading || (isLoading && profiles.length === 0)) {
+  // Show nothing while checking auth to avoid content flash before redirect
+  if (sessionLoading) {
+    return (
+      <main className="min-h-dvh flex items-center justify-center">
+        <div className="w-11 h-11 spinner" />
+      </main>
+    )
+  }
+
+  if (isLoading && profiles.length === 0) {
     return (
       <main className="min-h-dvh flex items-center justify-center">
         <div className="text-center animate-fade-in">
@@ -267,12 +277,14 @@ function SwipeableCard({
       {/* Photo */}
       <div className="relative h-[55%] overflow-hidden">
         {profile.photo_url ? (
-          <img
+          <Image
             src={profile.photo_url}
             alt={profile.display_name}
-            className="w-full h-full object-cover"
-            loading="eager"
+            fill
+            priority
             draggable={false}
+            className="object-cover"
+            sizes="(max-width: 430px) 100vw, 430px"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-surface-elevated">
@@ -347,6 +359,14 @@ function MatchPopup({
     return () => clearTimeout(timer)
   }, [onClose])
 
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape') onClose()
+    }
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [onClose])
+
   const whatsappLink = match.contact.whatsapp_number
     ? formatWhatsAppLink(match.contact.whatsapp_number, eventName)
     : null
@@ -395,10 +415,12 @@ function MatchPopup({
           <div className="absolute -inset-5 bg-accent/15 rounded-full blur-3xl pulse-glow" />
           <div className="w-[120px] h-[120px] rounded-full border-[3px] border-accent/25 shadow-[0_8px_32px_rgba(0,0,0,0.3)] overflow-hidden bg-surface relative">
             {match.contact.photo_url ? (
-              <img
+              <Image
                 src={match.contact.photo_url}
                 alt={match.contact.display_name}
-                className="w-full h-full object-cover"
+                fill
+                className="object-cover"
+                sizes="120px"
               />
             ) : (
               <div className="w-full h-full flex items-center justify-center">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useSession } from '@/lib/session-context'
 import { upsertProfile, uploadPhoto, getOwnProfile } from '@/lib/api'
@@ -160,8 +161,14 @@ export default function ProfilePage() {
       newErrors.display_name = 'El nombre debe tener al menos 2 caracteres'
     if (formData.headline.trim().length < 2)
       newErrors.headline = 'El titular es obligatorio'
-    if (!phoneNumber.trim())
+    if (!phoneNumber.trim()) {
       newErrors.whatsapp = 'El WhatsApp es obligatorio'
+    } else {
+      const digitsOnly = phoneNumber.replace(/[\s\-()]/g, '')
+      if (!/^\d{6,15}$/.test(digitsOnly)) {
+        newErrors.whatsapp = 'Ingresa un número válido (solo dígitos)'
+      }
+    }
     if (!consent)
       newErrors.consent = 'Debes aceptar para continuar'
 
@@ -170,6 +177,15 @@ export default function ProfilePage() {
     }
 
     setErrors(newErrors)
+
+    if (Object.keys(newErrors).length > 0) {
+      const firstErrorKey = Object.keys(newErrors)[0]
+      const errorId = firstErrorKey === 'photo' ? 'photo-upload' : `field-${firstErrorKey}`
+      requestAnimationFrame(() => {
+        document.getElementById(errorId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      })
+    }
+
     return Object.keys(newErrors).length === 0
   }
 
@@ -242,7 +258,7 @@ export default function ProfilePage() {
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Photo upload */}
-          <div className="flex flex-col items-center animate-fade-in-up" style={{ animationDelay: '50ms' }}>
+          <div id="photo-upload" className="flex flex-col items-center animate-fade-in-up" style={{ animationDelay: '50ms' }}>
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -251,7 +267,7 @@ export default function ProfilePage() {
             >
               {photoUrl ? (
                 <>
-                  <img src={photoUrl} alt="Perfil" className="w-full h-full object-cover" />
+                  <Image src={photoUrl} alt="Perfil" fill className="object-cover" sizes="120px" />
                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 group-active:opacity-100 transition-opacity flex items-center justify-center">
                     <span className="material-symbols-outlined text-white text-2xl">photo_camera</span>
                   </div>
@@ -273,7 +289,6 @@ export default function ProfilePage() {
               ref={fileInputRef}
               type="file"
               accept="image/*"
-              capture="environment"
               onChange={handlePhotoSelect}
               className="hidden"
             />
@@ -288,7 +303,7 @@ export default function ProfilePage() {
               Información pública
             </h2>
 
-            <div>
+            <div id="field-display_name">
               <label className="block text-sm font-medium mb-1.5 tracking-[-0.01em]">Nombre *</label>
               <input
                 type="text"
@@ -303,7 +318,7 @@ export default function ProfilePage() {
               )}
             </div>
 
-            <div>
+            <div id="field-headline">
               <label className="block text-sm font-medium mb-1.5 tracking-[-0.01em]">Titular *</label>
               <input
                 type="text"
@@ -377,7 +392,7 @@ export default function ProfilePage() {
               Tu número solo será visible cuando ambos conecten
             </p>
 
-            <div className="flex gap-2.5 items-center">
+            <div id="field-whatsapp" className="flex gap-2.5 items-center">
               <select
                 value={countryCode}
                 onChange={(e) => setCountryCode(e.target.value)}
